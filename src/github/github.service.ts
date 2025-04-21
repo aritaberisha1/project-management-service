@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import axios, { AxiosResponse } from 'axios';
 import { CreateRepositoryFromTemplateDto } from './dto/create-repository-from-template.dto';
+import { JiraService } from '../jira/jira.service';
 
 @Injectable()
 export class GitHubService {
     private readonly baseUrl: string;
     private readonly token: string;
 
-    constructor() {
+    constructor(private readonly jiraService: JiraService) {
         this.token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN || '';
         this.baseUrl = 'https://api.github.com';
     }
@@ -45,6 +46,14 @@ export class GitHubService {
                     },
                 },
             );
+
+            // After repository is successfully created, create a Jira board with the same name
+            try {
+                await this.jiraService.createBoard(createRepoDto.name);
+            } catch (jiraError) {
+                // Log error but don't fail the repository creation if Jira integration fails
+                console.error(`Repository created successfully, but Jira board creation failed: ${jiraError.message}`);
+            }
 
             return response.data;
         } catch (error) {
